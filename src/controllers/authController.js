@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const pool = require('../config/db');
+const { sendEmail } = require('../config/emailServices');
 const {
     findUserByEmail,
     createUser
@@ -66,6 +67,10 @@ class AuthController {
         return regex.test(email.toLowerCase());
     }
   
+    generateVerificationCode() {
+        return Math.floor(100000 + Math.random() * 900000);
+    }
+
     register = async (req, res, next) => {
         const { email, password, confirmation_password } = req.body;
     
@@ -94,7 +99,9 @@ class AuthController {
         } catch (error) {
             return res.status(400).json({ message: 'Error in email validation.' });
         }
-      
+
+        const verificationCode = this.generateVerificationCode();
+
         try {
             const existingUser = await findUserByEmail(email);
             if (existingUser) {
@@ -109,9 +116,35 @@ class AuthController {
             }
     
             await createUser(email, hashedPassword);
+
+            const emailSubject = 'Welcome to Our Platform - Verify Your Email';
+            const emailBody = `
+                Welcome to Our Platform!
+        
+                We are excited to have you on board. Whether you're looking to find your next job opportunity or to discover top talent for your company, we're here to support you every step of the way.
+        
+                Your verification code is: ${verificationCode}
+        
+                Please enter this code in our app to verify your email address and get started.
+        
+                Good luck with your job search if you're looking for new opportunities, or may you find the perfect candidate if you're hiring!
+        
+                Best Regards,
+                The Our Platform Team
+            `;
+
+            const emailOptions = {
+                from: process.env.EMAIL_USER,
+                to: email,
+                subject: emailSubject,
+                text: emailBody
+            };
+        
+            await sendEmail(emailOptions);
+
             res.status(201).json({ message: 'Registration successful.' });
         } catch (error) {
-            console.error('Registration error:', error);
+            console.error('Error during user creation and sending verification email:', error);
             return res.status(500).json({ message: 'An unexpected error occurred during registration.' });
         }
     }
