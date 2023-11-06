@@ -15,7 +15,9 @@ class AuthController {
 
     constructor() {
         this.register = this.register.bind(this);
-      }
+        this.verifyUser = this.verifyUser.bind(this);
+        this.resendVerificationCode = this.resendVerificationCode.bind(this);
+    }
 
     isPasswordValid(password) {
         let errorMessage = '';
@@ -118,7 +120,7 @@ class AuthController {
                 return res.status(500).json({ message: 'Error in password encryption.' });
             }
     
-            await createUser(email, hashedPassword);
+            await createUser(email, hashedPassword, verificationCode);
 
             const emailSubject = 'Welcome to Our Platform - Verify Your Email';
             const emailBody = `
