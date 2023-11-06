@@ -8,4 +8,6 @@ router.post('/verify', authController.verifyUser.bind(authController));
 
 router.post('/resend', authController.resendVerificationCode.bind(authController));
 
+router.post('/login', authController.login.bind(authController))
+
 module.exports = router;

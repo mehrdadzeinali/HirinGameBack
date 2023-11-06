@@ -17,6 +17,7 @@ class AuthController {
         this.register = this.register.bind(this);
         this.verifyUser = this.verifyUser.bind(this);
         this.resendVerificationCode = this.resendVerificationCode.bind(this);
+        this.login = this.login.bind(this)
     }
 
     isPasswordValid(password) {
@@ -122,9 +123,9 @@ class AuthController {
     
             await createUser(email, hashedPassword, verificationCode);
 
-            const emailSubject = 'Welcome to Our Platform - Verify Your Email';
+            const emailSubject = 'Welcome to HirinGame - Verify Your Email';
             const emailBody = `
-                Welcome to Our Platform!
+                Welcome to HirinGame!
         
                 We are excited to have you on board. Whether you're looking to find your next job opportunity or to discover top talent for your company, we're here to support you every step of the way.
         
@@ -135,7 +136,7 @@ class AuthController {
                 Good luck with your job search if you're looking for new opportunities, or may you find the perfect candidate if you're hiring!
         
                 Best Regards,
-                The Our Platform Team
+                HirinGame Team
             `;
 
             const emailOptions = {
@@ -230,7 +231,47 @@ class AuthController {
           console.error('Error resending verification code:', error);
           return res.status(500).json({ message: 'An unexpected error occurred while resending the verification code.' });
         }
+    }
+
+    login = async (req, res, next) => {
+      const { email, password } = req.body;
+    
+      if (!email || !password) {
+        return res.status(400).json({ message: 'Email and password are required.' });
       }
+    
+      try {
+        const user = await findUserByEmail(email);
+        if (!user) {
+          return res.status(401).json({ message: 'Invalid credentials.' });
+        }
+
+        if (!user.email_verified) {
+          return res.status(401).json({ message: 'Please verify your email to login.' });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+          return res.status(401).json({ message: 'Invalid credentials.' });
+        }
+
+        const payload = {
+          user: {
+            id: user.id,
+            email: user.email
+          }
+        };
+
+        jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' }, (err, token) => {
+          if (err) throw err;
+          res.json({ token });
+        });
+    
+      } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ message: 'Server error' });
+      }
+    }
 }
-  
+
 module.exports = new AuthController();
