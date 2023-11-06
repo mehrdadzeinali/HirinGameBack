@@ -195,14 +195,18 @@ class AuthController {
           if (!user) {
             return res.status(404).json({ message: 'User not found.' });
           }
+
+          if (user.email_verified) {
+            return res.status(401).json({ message: 'Email is already verified.' });
+          }
       
           const newVerificationCode = this.generateVerificationCode();
       
           await updateVerificationCode(email, newVerificationCode);
       
-          const emailSubject = 'Welcome to Our Platform - Verify Your Email';
+          const emailSubject = 'Welcome to HirinGame - Verify Your Email';
           const emailBody = `
-              Welcome to Our Platform!
+              Welcome to HirinGame!
       
               We are excited to have you on board. Whether you're looking to find your next job opportunity or to discover top talent for your company, we're here to support you every step of the way.
       
@@ -213,7 +217,7 @@ class AuthController {
               Good luck with your job search if you're looking for new opportunities, or may you find the perfect candidate if you're hiring!
       
               Best Regards,
-              The Our Platform Team
+              HirinGame Team
           `;
 
           const emailOptions = {
