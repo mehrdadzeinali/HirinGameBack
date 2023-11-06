@@ -4,7 +4,10 @@ const pool = require('../config/db');
 const { sendEmail } = require('../config/emailServices');
 const {
     findUserByEmail,
-    createUser
+    createUser,
+    checkVerificationCode,
+    updateUserEmailVerified,
+    updateVerificationCode
   } = require('../models/userModel');
 
 
@@ -148,6 +151,84 @@ class AuthController {
             return res.status(500).json({ message: 'An unexpected error occurred during registration.' });
         }
     }
-  }
+
+    verifyUser = async (req, res, next) => {
+        const { email, verificationCode } = req.body;
+    
+        if (!email || !verificationCode) {
+          return res.status(400).json({ message: 'Email and verification code are required.' });
+        }
+    
+        try {
+          const user = await findUserByEmail(email);
+          if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+          }
+      
+          const isCodeMatch = await checkVerificationCode(email, verificationCode);
+      
+          if (!isCodeMatch) {
+            return res.status(400).json({ message: 'Verification code is incorrect.' });
+          }
+
+          await updateUserEmailVerified(user.id, true, null);
+      
+          res.status(200).json({ message: 'Email verified successfully.' });
+        } catch (error) {
+          console.error('Verification error:', error);
+          return res.status(500).json({ message: 'An unexpected error occurred during verification.' });
+        }
+    }
+
+    resendVerificationCode = async (req, res, next) => {
+        const { email } = req.body;
+    
+        if (!email) {
+          return res.status(400).json({ message: 'Email is required.' });
+        }
+    
+        try {
+          const user = await findUserByEmail(email);
+          if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+          }
+      
+          const newVerificationCode = this.generateVerificationCode();
+      
+          await updateVerificationCode(email, newVerificationCode);
+      
+          const emailSubject = 'Welcome to Our Platform - Verify Your Email';
+          const emailBody = `
+              Welcome to Our Platform!
+      
+              We are excited to have you on board. Whether you're looking to find your next job opportunity or to discover top talent for your company, we're here to support you every step of the way.
+      
+              Your verification code is: ${newVerificationCode}
+      
+              Please enter this code in our app to verify your email address and get started.
+      
+              Good luck with your job search if you're looking for new opportunities, or may you find the perfect candidate if you're hiring!
+      
+              Best Regards,
+              The Our Platform Team
+          `;
+
+          const emailOptions = {
+              from: process.env.EMAIL_USER,
+              to: email,
+              subject: emailSubject,
+              text: emailBody
+          };
+      
+          await sendEmail(emailOptions);
+
+      
+          res.status(200).json({ message: 'Verification code resent successfully.' });
+        } catch (error) {
+          console.error('Error resending verification code:', error);
+          return res.status(500).json({ message: 'An unexpected error occurred while resending the verification code.' });
+        }
+      }
+}
   
-  module.exports = new AuthController();
+module.exports = new AuthController();
