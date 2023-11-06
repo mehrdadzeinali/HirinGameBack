@@ -7,7 +7,10 @@ const {
     createUser,
     checkVerificationCode,
     updateUserEmailVerified,
-    updateVerificationCode
+    updateVerificationCode,
+    setPasswordResetCodeAndExpiry,
+    checkPasswordResetCode,
+    updateUserPassword
   } = require('../models/userModel');
 
 
@@ -18,6 +21,8 @@ class AuthController {
         this.verifyUser = this.verifyUser.bind(this);
         this.resendVerificationCode = this.resendVerificationCode.bind(this);
         this.login = this.login.bind(this)
+        this.forgotPassword = this.forgotPassword.bind(this)
+        this.resetForgettenPassword = this.resetForgettenPassword.bind(this)
     }
 
     isPasswordValid(password) {
@@ -276,6 +281,99 @@ class AuthController {
         res.status(500).json({ message: 'Server error' });
       }
     }
+
+    forgotPassword = async (req, res, next) => {
+        const { email } = req.body;
+    
+        if (!email) {
+            return res.status(400).json({ message: 'Email is required.' });
+        }
+    
+        try {
+            const user = await findUserByEmail(email);
+            if (!user) {
+                return res.status(200).json({ message: 'If a user with that email exists, we will send them a password reset code.' });
+            }
+
+            const passwordResetCode = this.generateVerificationCode();
+
+            await setPasswordResetCodeAndExpiry(email, passwordResetCode);
+        
+            const emailSubject = 'Your HirinGame Password Reset Code';
+            const emailBody = `
+                Here is your password reset code: ${passwordResetCode}
+                
+                Please enter this code on the password reset page.
+        
+                If you did not request a password reset, please ignore this email.
+        
+                The code is valid for 20 minutes only.
+        
+                Best Regards,
+                HirinGame Team
+            `;
+        
+            const emailOptions = {
+                from: process.env.EMAIL_USER,
+                to: email,
+                subject: emailSubject,
+                text: emailBody
+            };
+        
+            await sendEmail(emailOptions);
+        
+            res.status(200).json({ message: 'If a user with that email exists, we have sent them a password reset code.' });
+        } catch (error) {
+            console.error('Error in forgotPassword:', error);
+            return res.status(500).json({ message: 'An unexpected error occurred while processing the password reset.' });
+        }
+    }
+
+    resetForgettenPassword = async (req, res, next) => {
+        const { email, code, newPassword, confirmationNewPassword } = req.body;
+    
+        if (!email || !code || !newPassword || !confirmationNewPassword) {
+            return res.status(400).json({ message: 'All fields are required.' });
+        }
+
+        if (newPassword !== confirmationNewPassword) {
+            return res.status(400).json({ message: 'Passwords do not match.' });
+        }
+    
+        try {
+            const { valid, message } = this.isPasswordValid(newPassword);
+            if (!valid) {
+                return res.status(400).json({ message });
+            }
+        } catch (error) {
+            console.error('Password validation error:', error);
+            return res.status(400).json({ message: 'Error in password validation: ' + error.message });
+        }
+    
+        try {
+            const user = await findUserByEmail(email);
+        
+            if (!user) {
+                return res.status(200).json({ message: 'Invalid code or code has expired.' });
+            }
+
+            const isCodeValid = await checkPasswordResetCode(email, code);
+        
+            if (!isCodeValid) {
+                return res.status(400).json({ message: 'Invalid code or code has expired.' });
+            }
+
+            const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+            await updateUserPassword(email, hashedPassword);
+        
+            res.status(200).json({ message: 'Your password has been reset successfully. Please login with your new password.' });
+        } catch (error) {
+            console.error('Error in resetPassword:', error);
+            return res.status(500).json({ message: 'An unexpected error occurred while resetting the password.' });
+        }
+    }
+
 }
 
 module.exports = new AuthController();

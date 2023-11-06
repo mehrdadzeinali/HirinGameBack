@@ -2,13 +2,18 @@ const pool = require('../config/db');
 
 const createUserTable = async () => {
   try {
-    await pool.execute(`CREATE TABLE IF NOT EXISTS users (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      email VARCHAR(255) NOT NULL UNIQUE,
-      password VARCHAR(255) NOT NULL,
-      email_verified BOOLEAN DEFAULT false,
-      verification_code VARCHAR(6) DEFAULT NULL  // Allows null values initially, assuming not all users will have a code right away
-    )`);
+    const createTableQuery = `
+      CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        password VARCHAR(255) NOT NULL,
+        email_verified BOOLEAN DEFAULT false,
+        verification_code VARCHAR(6) DEFAULT NULL,  // Allows null values for email verification codes
+        password_reset_code VARCHAR(6) DEFAULT NULL,  // For storing password reset codes
+        password_reset_code_expiry DATETIME DEFAULT NULL  // To store the expiry time of the reset code
+      )
+    `;
+    await pool.execute(createTableQuery);
     console.log("User table created or already exists.");
   } catch (error) {
     console.error("Could not create user table:", error);
@@ -45,11 +50,32 @@ const updateVerificationCode = async (email, newVerificationCode) => {
   return result.affectedRows;
 };
 
+const setPasswordResetCodeAndExpiry = async (email, code) => {
+  const expiry = new Date();
+  expiry.setMinutes(expiry.getMinutes() + 20);
+
+  const [result] = await pool.query('UPDATE users SET verification_code = ?, password_reset_code_expiry = ? WHERE email = ?', [code, expiry, email]);
+  return result.affectedRows;
+};
+
+const checkPasswordResetCode = async (email, code) => {
+  const [rows] = await pool.query('SELECT * FROM users WHERE email = ? AND verification_code = ? AND password_reset_code_expiry > ?', [email, code, new Date()]);
+  return rows.length > 0;
+};
+
+const updateUserPassword = async (email, hashedPassword) => {
+  const [result] = await pool.query('UPDATE users SET password = ?, verification_code = NULL, password_reset_code_expiry = NULL WHERE email = ?', [hashedPassword, email]);
+  return result.affectedRows;
+};
+
 module.exports = {
   createUserTable,
   findUserByEmail,
   createUser,
   updateUserEmailVerified,
   checkVerificationCode,
-  updateVerificationCode
+  updateVerificationCode,
+  setPasswordResetCodeAndExpiry,
+  checkPasswordResetCode,
+  updateUserPassword
 };

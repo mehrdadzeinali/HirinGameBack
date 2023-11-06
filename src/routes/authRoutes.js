@@ -10,4 +10,8 @@ router.post('/resend', authController.resendVerificationCode.bind(authController
 
 router.post('/login', authController.login.bind(authController))
 
+router.post('/forgot-password', authController.forgotPassword.bind(authController))
+
+router.post('/reset-forgotten-password', authController.resetForgettenPassword.bind(authController))
+
 module.exports = router;
