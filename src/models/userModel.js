@@ -68,6 +68,7 @@ const updateUserPassword = async (email, hashedPassword) => {
   return result.affectedRows;
 };
 
+
 module.exports = {
   createUserTable,
   findUserByEmail,

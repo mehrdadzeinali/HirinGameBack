@@ -23,6 +23,7 @@ class AuthController {
         this.login = this.login.bind(this)
         this.forgotPassword = this.forgotPassword.bind(this)
         this.resetForgettenPassword = this.resetForgettenPassword.bind(this)
+        this.resetPassword = this.resetPassword.bind(this)
     }
 
     isPasswordValid(password) {
@@ -373,6 +374,44 @@ class AuthController {
             return res.status(500).json({ message: 'An unexpected error occurred while resetting the password.' });
         }
     }
+
+    resetPassword = async (req, res, next) => {
+        const { email, oldPassword, newPassword, confirmationNewPassword } = req.body;
+
+        if (!email || !oldPassword || !newPassword || !confirmationNewPassword) {
+            return res.status(400).json({ message: 'All fields are required.' });
+        }
+    
+        if (newPassword !== confirmationNewPassword) {
+            return res.status(400).json({ message: 'New passwords do not match.' });
+        }
+    
+        try {
+            const user = await findUserByEmail(email);
+            if (!user) {
+                return res.status(404).json({ message: 'User not found.' });
+            }
+    
+            const isMatch = await bcrypt.compare(oldPassword, user.password);
+            if (!isMatch) {
+                return res.status(401).json({ message: 'Old password is incorrect.' });
+            }
+    
+            const { valid, message } = this.isPasswordValid(newPassword);
+            if (!valid) {
+                return res.status(400).json({ message });
+            }
+
+            const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+            await updateUserPassword(user.email, hashedPassword);
+    
+            res.status(200).json({ message: 'Password updated successfully.' });
+        } catch (error) {
+            console.error('Error in resetPassword:', error);
+            return res.status(500).json({ message: 'An unexpected error occurred.' });
+        }
+    }    
 
 }
 
