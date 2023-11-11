@@ -163,11 +163,11 @@ class AuthController {
 
     verifyUser = async (req, res, next) => {
         const { email, verificationCode } = req.body;
-    
+      
         if (!email || !verificationCode) {
           return res.status(400).json({ message: 'Email and verification code are required.' });
         }
-    
+      
         try {
           const user = await findUserByEmail(email);
           if (!user) {
@@ -179,15 +179,29 @@ class AuthController {
           if (!isCodeMatch) {
             return res.status(400).json({ message: 'Verification code is incorrect.' });
           }
-
-          await updateUserEmailVerified(user.id, true, null);
       
-          res.status(200).json({ message: 'Email verified successfully.' });
+          await updateUserEmailVerified(user.id, true, null);
+
+          const payload = {
+            user: {
+              id: user.id,
+              email: user.email
+            }
+          };
+      
+          jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' }, (err, token) => {
+            if (err) {
+              console.error('Error generating JWT:', err);
+              return res.status(500).json({ message: 'Error generating authentication token.' });
+            }
+            res.status(200).json({ message: 'Email verified successfully.', token });
+          });
+      
         } catch (error) {
           console.error('Verification error:', error);
           return res.status(500).json({ message: 'An unexpected error occurred during verification.' });
         }
-    }
+    }      
 
     resendVerificationCode = async (req, res, next) => {
         const { email } = req.body;
